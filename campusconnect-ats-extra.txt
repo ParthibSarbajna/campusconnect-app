@@ -1,0 +1,443 @@
+
+========== frontend\src\api\client.js ==========
+
+
+ // Single place where the browser talks to the backend.
+ // Authentication is a server-side session in an HttpOnly cookie (never readable from JavaScript).
+ // State-changing requests also carry a CSRF token fetched from GET /auth/csrf.
+
+const BASE = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '');
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+export class ApiError extends Error {
+  constructor(message, { status = 0, body = null } = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
+let csrf = null;
+let csrfPromise = null;
+let unauthorizedHandler = null;
+
+/** Called when any request (except a failed login) comes back 401, i.e. the session expired. */
+export function setUnauthorizedHandler(fn) {
+  unauthorizedHandler = fn;
+}
+
+export function resetCsrf() {
+  csrf = null;
+  csrfPromise = null;
+}
+
+async function send(path, { method = 'GET', body, signal, headers = {} } = {}) {
+  let res;
+
+  // FormData must not be JSON-serialized or assigned a manual Content-Type.
+  const isFormData = body instanceof FormData;
+
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method,
+      credentials: 'include',
+      signal,
+      headers: {
+        Accept: 'application/json',
+        ...(body !== undefined && !isFormData
+          ? { 'Content-Type': 'application/json' }
+          : {}),
+        ...headers,
+      },
+      body: body !== undefined
+        ? (isFormData ? body : JSON.stringify(body))
+        : undefined,
+    });
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      throw e;
+    }
+
+    throw new ApiError(
+      'Cannot reach the server. Check that the backend is running.',
+      { status: 0 }
+    );
+  }
+
+  const text = await res.text();
+  let data = null;
+
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = text;
+    }
+  }
+
+  if (!res.ok) {
+    const message =
+      (data && (data.detail || data.title))
+      || `Request failed (${res.status})`;
+
+    throw new ApiError(message, {
+      status: res.status,
+      body: data,
+    });
+  }
+
+  return data;
+}
+
+async function ensureCsrf() {
+  if (csrf) {
+    return csrf;
+  }
+
+  if (!csrfPromise) {
+    csrfPromise = send('/auth/csrf')
+      .then((data) => {
+        csrf = data;
+        return data;
+      })
+      .finally(() => {
+        csrfPromise = null;
+      });
+  }
+
+  return csrfPromise;
+}
+
+async function sendWithCsrf(path, opts, retried = false) {
+  const token = await ensureCsrf();
+
+  try {
+    return await send(path, {
+      ...opts,
+      headers: {
+        ...opts.headers,
+        [token.headerName]: token.token,
+      },
+    });
+  } catch (e) {
+    // A 403 can mean the CSRF token went stale (new session).
+    // Refresh it and retry exactly once.
+    if (e instanceof ApiError && e.status === 403 && !retried) {
+      resetCsrf();
+      return sendWithCsrf(path, opts, true);
+    }
+
+    throw e;
+  }
+}
+
+export async function apiRequest(path, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+  const opts = {
+    ...options,
+    method,
+  };
+
+  try {
+    return SAFE_METHODS.has(method)
+      ? await send(path, opts)
+      : await sendWithCsrf(path, opts);
+  } catch (e) {
+    if (
+      e instanceof ApiError
+      && e.status === 401
+      && !path.startsWith('/auth/login')
+      && unauthorizedHandler
+    ) {
+      unauthorizedHandler();
+    }
+
+    throw e;
+  }
+}
+
+========== frontend\src\pages\StudentHome.test.jsx ==========
+
+
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AuthContext } from '../auth/AuthContext.jsx';
+import StudentHome from './StudentHome.jsx';
+
+vi.mock('../api/accounts.js', () => ({
+  changePassword: vi.fn(),
+  updateProfile: vi.fn(),
+}));
+
+vi.mock('../api/studentProfile.js', () => ({
+  getStudentProfile: vi.fn(),
+  saveStudentProfile: vi.fn(),
+}));
+
+import * as accountsApi from '../api/accounts.js';
+import * as profileApi from '../api/studentProfile.js';
+
+const studentUser = {
+  id: 1,
+  email: 'student@example.com',
+  fullName: 'Test Student',
+  role: 'STUDENT',
+  departmentId: null,
+  enabled: true,
+};
+
+function renderPage() {
+  const auth = {
+    status: 'authenticated',
+    user: studentUser,
+    refresh: vi.fn().mockResolvedValue(studentUser),
+  };
+
+  render(
+    <AuthContext.Provider value={auth}>
+      <StudentHome />
+    </AuthContext.Provider>,
+  );
+
+  return auth;
+}
+
+const savedProfile = {
+  id: 1,
+  userId: 1,
+  rollNumber: 'CSE001',
+  phone: '9876543210',
+  dateOfBirth: '2004-05-12',
+  degree: 'B.Tech',
+  branch: 'CSE',
+  graduationYear: 2027,
+  cgpa: 8.5,
+  activeBacklogs: 0,
+  resumeUrl: '',
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  profileApi.getStudentProfile.mockResolvedValue(savedProfile);
+  profileApi.saveStudentProfile.mockResolvedValue(savedProfile);
+  accountsApi.updateProfile.mockResolvedValue({});
+  accountsApi.changePassword.mockResolvedValue({});
+});
+
+describe('StudentHome student profile', () => {
+  it('loads and displays the saved academic details', async () => {
+    renderPage();
+
+    expect(await screen.findByLabelText('Roll number')).toHaveValue('CSE001');
+    expect(screen.getByLabelText('Degree')).toHaveValue('B.Tech');
+    expect(screen.getByLabelText('Branch')).toHaveValue('CSE');
+    expect(screen.getByLabelText('Graduation year')).toHaveValue(2027);
+    expect(screen.getByLabelText('CGPA (0–10)')).toHaveValue(8.5);
+    expect(profileApi.getStudentProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an empty form when the student has no saved profile', async () => {
+    profileApi.getStudentProfile.mockRejectedValue(
+      Object.assign(new Error('Student profile not found.'), { status: 404 }),
+    );
+
+    renderPage();
+
+    expect(await screen.findByLabelText('Roll number')).toHaveValue('');
+    expect(screen.getByLabelText('Degree')).toHaveValue('');
+    expect(screen.getByLabelText('Active backlogs')).toHaveValue(0);
+  });
+
+  it('saves the edited profile and shows confirmation', async () => {
+    renderPage();
+
+    const rollNumber = await screen.findByLabelText('Roll number');
+    fireEvent.change(rollNumber, { target: { value: 'CSE002' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save student profile' }));
+
+    await waitFor(() => {
+      expect(profileApi.saveStudentProfile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          rollNumber: 'CSE002',
+          degree: 'B.Tech',
+          branch: 'CSE',
+          graduationYear: 2027,
+          cgpa: 8.5,
+          activeBacklogs: 0,
+        }),
+      );
+    });
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Student profile saved successfully.',
+    );
+  });
+
+  it('rejects an invalid CGPA before calling the API', async () => {
+    renderPage();
+
+    fireEvent.change(await screen.findByLabelText('CGPA (0–10)'), {
+      target: { value: '11' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save student profile' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'CGPA must be between 0 and 10',
+    );
+    expect(profileApi.saveStudentProfile).not.toHaveBeenCalled();
+  });
+
+  it('shows a server error when saving the profile fails', async () => {
+    profileApi.saveStudentProfile.mockRejectedValue(
+      new Error('That roll number is already in use.'),
+    );
+
+    renderPage();
+
+    fireEvent.change(await screen.findByLabelText('Roll number'), {
+      target: { value: 'DUPLICATE' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save student profile' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'That roll number is already in use.',
+    );
+  });
+});
+
+========== frontend\src\index.css ==========
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{--bg:#f4f5f8;--surf:#fff;--ink:#101828;--mute:#5b6577;--line:#dfe3ea;--pri:#1f4fd8;--prit:#e6ecff;--on-pri:#fff;--ok:#0b8a5f;--okt:#dcf5ea;--warn:#b7791f;--warnt:#fdf0d5;--bad:#c0392b;--badt:#fbe3e0;--board:#0d1424;--amber:#ffb83d}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0b101c;--surf:#141b2b;--ink:#e8ecf5;--mute:#9aa5ba;--line:#26304a;--pri:#7c9bff;--prit:#1d2a52;--on-pri:#0b101c;--ok:#4cd6a0;--okt:#10382c;--warn:#f0b955;--warnt:#3a2d12;--bad:#ff8a7a;--badt:#3d1b18;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b101c;--surf:#141b2b;--ink:#e8ecf5;--mute:#9aa5ba;--line:#26304a;--pri:#7c9bff;--prit:#1d2a52;--on-pri:#0b101c;--ok:#4cd6a0;--okt:#10382c;--warn:#f0b955;--warnt:#3a2d12;--bad:#ff8a7a;--badt:#3d1b18;color-scheme:dark}
+
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"DM Sans",system-ui,sans-serif;line-height:1.5}
+h1,h2,h3{font-family:"Bricolage Grotesque","DM Sans",sans-serif;letter-spacing:-.02em;margin:0}
+:focus-visible{outline:3px solid var(--pri);outline-offset:2px}
+
+@layer components{
+  .card{@apply rounded-xl border border-line bg-surf p-5}
+  .btn{@apply inline-flex items-center gap-2 rounded-lg bg-pri px-4 py-2 font-bold text-onpri disabled:cursor-not-allowed disabled:opacity-50}
+  .btn-ghost{@apply inline-flex items-center gap-2 rounded-lg border border-line bg-transparent px-3 py-1.5 text-sm font-medium text-ink}
+  .pill{@apply inline-block rounded-full px-2.5 py-0.5 text-xs font-bold}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+
+========== MISSING: frontend\src\App.css ==========
+
+
+========== backend\src\test\java\com\campusconnect\student\StudentProfileServiceTest.java ==========
+
+package com.campusconnect.student;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.campusconnect.auth.AuthUser;
+import com.campusconnect.auth.Role;
+import com.campusconnect.common.ApiException;
+import com.campusconnect.student.StudentProfileDtos.StudentProfileResponse;
+import com.campusconnect.student.StudentProfileDtos.UpdateStudentProfileRequest;
+import java.math.BigDecimal;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+
+class StudentProfileServiceTest {
+
+    private final StudentProfileRepository profiles =
+            mock(StudentProfileRepository.class);
+
+    private final StudentProfileService service =
+            new StudentProfileService(profiles);
+
+    private final AuthUser student =
+            new AuthUser(7L, "student@example.edu", "Test Student",
+                    Role.STUDENT, null);
+
+    @Test
+    void missingProfileReturnsNotFound() {
+        when(profiles.findByUserId(7L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.getMyProfile(student))
+                .isInstanceOfSatisfying(ApiException.class, ex -> {
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.NOT_FOUND);
+                });
+    }
+
+    @Test
+    void updateCreatesProfileForAuthenticatedUser() {
+        when(profiles.findByUserId(7L)).thenReturn(Optional.empty());
+        when(profiles.existsByRollNumberIgnoreCase("CC001"))
+                .thenReturn(false);
+        when(profiles.saveAndFlush(any(StudentProfile.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateStudentProfileRequest request =
+                new UpdateStudentProfileRequest(
+                        "CC001", "9876543210", null,
+                        "B.Tech", "CSE", (short) 2027,
+                        new BigDecimal("8.50"), (short) 0, null);
+
+        StudentProfileResponse response =
+                service.updateMyProfile(student, request);
+
+        assertThat(response.userId()).isEqualTo(7L);
+        assertThat(response.rollNumber()).isEqualTo("CC001");
+        assertThat(response.cgpa()).isEqualByComparingTo("8.50");
+        verify(profiles).saveAndFlush(any(StudentProfile.class));
+    }
+
+    @Test
+    void duplicateRollNumberIsRejected() {
+        StudentProfile existing = new StudentProfile(7L);
+        existing.updateDetails(
+                "CC001", null, null, null, null,
+                null, null, (short) 0, null);
+
+        when(profiles.findByUserId(7L)).thenReturn(Optional.of(existing));
+        when(profiles.existsByRollNumberIgnoreCase("CC002"))
+                .thenReturn(true);
+
+        UpdateStudentProfileRequest request =
+                new UpdateStudentProfileRequest(
+                        "CC002", null, null, null, null,
+                        null, null, (short) 0, null);
+
+        assertThatThrownBy(() -> service.updateMyProfile(student, request))
+                .isInstanceOfSatisfying(ApiException.class, ex -> {
+                    assertThat(ex.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+                });
+
+        verify(profiles, never()).saveAndFlush(any(StudentProfile.class));
+    }
+
+    @Test
+    void blankRollNumberIsNormalizedToNull() {
+        when(profiles.findByUserId(7L)).thenReturn(Optional.empty());
+        when(profiles.saveAndFlush(any(StudentProfile.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        UpdateStudentProfileRequest request =
+                new UpdateStudentProfileRequest(
+                        "   ", null, null, null, null,
+                        null, null, null, null);
+
+        StudentProfileResponse response =
+                service.updateMyProfile(student, request);
+
+        assertThat(response.rollNumber()).isNull();
+        assertThat(response.activeBacklogs()).isZero();
+    }
+}

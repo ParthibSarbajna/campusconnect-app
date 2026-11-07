@@ -1,0 +1,1149 @@
+
+
+========== frontend\src\pages\StudentHome.jsx ==========
+
+
+import { useEffect, useState } from 'react';
+import { changePassword, updateProfile } from '../api/accounts.js';
+import {
+  getStudentProfile,
+  saveStudentProfile,
+  uploadStudentResume,
+  analyzeStudentResume,
+} from '../api/studentProfile.js';
+import { useAuth } from '../auth/AuthContext.jsx';
+import { validateName, validatePassword } from '../auth/validators.js';
+import Field from '../components/Field.jsx';
+
+const emptyProfile = {
+  rollNumber: '',
+  phone: '',
+  dateOfBirth: '',
+  degree: '',
+  branch: '',
+  graduationYear: '',
+  cgpa: '',
+  activeBacklogs: '0',
+};
+
+function toFormValues(profile) {
+  return {
+    rollNumber: profile.rollNumber ?? '',
+    phone: profile.phone ?? '',
+    dateOfBirth: profile.dateOfBirth ?? '',
+    degree: profile.degree ?? '',
+    branch: profile.branch ?? '',
+    graduationYear: profile.graduationYear?.toString() ?? '',
+    cgpa: profile.cgpa?.toString() ?? '',
+    activeBacklogs: (profile.activeBacklogs ?? 0).toString(),
+  };
+}
+
+function validateStudentProfile(form) {
+  const year = form.graduationYear.trim();
+  const cgpa = form.cgpa.trim();
+  const backlogs = form.activeBacklogs.trim();
+
+  if (form.rollNumber.length > 40) return 'Roll number must be 40 characters or fewer.';
+  if (form.phone.length > 20) return 'Phone number must be 20 characters or fewer.';
+  if (form.degree.length > 100) return 'Degree must be 100 characters or fewer.';
+  if (form.branch.length > 120) return 'Branch must be 120 characters or fewer.';
+
+  if (form.dateOfBirth && form.dateOfBirth >= new Date().toISOString().slice(0, 10)) {
+    return 'Date of birth must be in the past.';
+  }
+
+  if (year && (!/^\d{4}$/.test(year) || Number(year) < 2000 || Number(year) > 2100)) {
+    return 'Graduation year must be between 2000 and 2100.';
+  }
+
+  if (cgpa && (!/^\d{1,2}(\.\d{1,2})?$/.test(cgpa) || Number(cgpa) < 0 || Number(cgpa) > 10)) {
+    return 'CGPA must be between 0 and 10, with up to two decimal places.';
+  }
+
+  if (!/^\d+$/.test(backlogs) || Number(backlogs) > 32767) {
+    return 'Active backlogs must be a non-negative whole number.';
+  }
+
+  return '';
+}
+
+export default function StudentHome() {
+  const { user, refresh } = useAuth();
+
+  const [name, setName] = useState(user.fullName);
+  const [nameError, setNameError] = useState('');
+  const [nameMsg, setNameMsg] = useState('');
+
+  const [pw, setPw] = useState({ current: '', next: '' });
+  const [pwError, setPwError] = useState('');
+  const [pwMsg, setPwMsg] = useState('');
+
+  const [profile, setProfile] = useState(emptyProfile);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState('');
+  const [profileMsg, setProfileMsg] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  const [resumeFile, setResumeFile] = useState(null);
+  const [resumeUploading, setResumeUploading] = useState(false);
+  const [resumeError, setResumeError] = useState('');
+  const [resumeMsg, setResumeMsg] = useState('');
+  const [resumeUploaded, setResumeUploaded] = useState(false);
+
+  const [jobDescription, setJobDescription] = useState('');
+  const [analysis, setAnalysis] = useState(null);
+  const [analysisError, setAnalysisError] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    getStudentProfile()
+      .then((data) => {
+        if (!active) return;
+        setProfile(toFormValues(data));
+        setProfileError('');
+      })
+      .catch((error) => {
+        if (!active) return;
+        if (error.status === 404) {
+          setProfile(emptyProfile);
+        } else {
+          setProfileError(error.message || 'Could not load your student profile.');
+        }
+      })
+      .finally(() => {
+        if (active) setProfileLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function saveName(e) {
+    e.preventDefault();
+    setNameMsg('');
+
+    const err = validateName(name);
+    setNameError(err);
+    if (err) return;
+
+    try {
+      await updateProfile(name.trim());
+      await refresh();
+      setNameMsg('Name updated.');
+      setNameError('');
+    } catch (ex) {
+      setNameError(ex.message);
+    }
+  }
+
+  async function savePassword(e) {
+    e.preventDefault();
+    setPwMsg('');
+
+    const err = pw.current ? validatePassword(pw.next) : 'Enter your current password.';
+    setPwError(err);
+    if (err) return;
+
+    try {
+      await changePassword(pw.current, pw.next);
+      setPw({ current: '', next: '' });
+      setPwMsg('Password changed.');
+      setPwError('');
+    } catch (ex) {
+      setPwError(ex.message);
+    }
+  }
+
+  function updateField(field, value) {
+    setProfile((current) => ({ ...current, [field]: value }));
+    setProfileMsg('');
+    setProfileError('');
+  }
+
+  async function saveStudentDetails(e) {
+    e.preventDefault();
+    setProfileMsg('');
+
+    const error = validateStudentProfile(profile);
+    if (error) {
+      setProfileError(error);
+      return;
+    }
+
+    setProfileSaving(true);
+    setProfileError('');
+
+    const payload = {
+      rollNumber: profile.rollNumber.trim() || null,
+      phone: profile.phone.trim() || null,
+      dateOfBirth: profile.dateOfBirth || null,
+      degree: profile.degree.trim() || null,
+      branch: profile.branch.trim() || null,
+      graduationYear: profile.graduationYear ? Number(profile.graduationYear) : null,
+      cgpa: profile.cgpa ? Number(profile.cgpa) : null,
+      activeBacklogs: Number(profile.activeBacklogs),
+    };
+
+    try {
+      const saved = await saveStudentProfile(payload);
+      setProfile(toFormValues(saved));
+      setProfileMsg('Student profile saved successfully.');
+    } catch (error) {
+      setProfileError(error.message || 'Could not save your student profile.');
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
+  async function handleResumeUpload(e) {
+    e.preventDefault();
+    setResumeError('');
+    setResumeMsg('');
+
+    if (!resumeFile) {
+      setResumeError('Please choose a PDF resume first.');
+      return;
+    }
+
+    if (resumeFile.type !== 'application/pdf') {
+      setResumeError('Only PDF files are allowed.');
+      return;
+    }
+
+    if (resumeFile.size > 5 * 1024 * 1024) {
+      setResumeError('Resume must be 5 MB or smaller.');
+      return;
+    }
+
+    setResumeUploading(true);
+
+    try {
+      await uploadStudentResume(resumeFile);
+      setResumeUploaded(true);
+      setResumeMsg('Resume uploaded successfully.');
+      setResumeFile(null);
+      e.target.reset();
+      setAnalysis(null);
+    } catch (error) {
+      setResumeError(error.message || 'Could not upload resume.');
+    } finally {
+      setResumeUploading(false);
+    }
+  }
+
+  async function handleAnalyzeResume(e) {
+    e.preventDefault();
+    setAnalysisError('');
+    setAnalysis(null);
+
+    if (!jobDescription.trim()) {
+      setAnalysisError('Paste the job description first.');
+      return;
+    }
+
+    setAnalyzing(true);
+
+    try {
+      const result = await analyzeStudentResume(jobDescription);
+      setAnalysis(result);
+    } catch (error) {
+      setAnalysisError(error.message || 'Could not analyze your resume.');
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  return (
+    <main className="mx-auto grid max-w-3xl gap-4 px-4 py-8">
+      <h1 className="text-3xl font-extrabold">My account</h1>
+
+      <section className="card" aria-labelledby="acct">
+        <h2 id="acct" className="text-lg">Account details</h2>
+
+        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+          <dt className="text-mute">Email</dt><dd>{user.email}</dd>
+          <dt className="text-mute">Role</dt><dd>Student</dd>
+        </dl>
+
+        <form onSubmit={saveName} noValidate>
+          <Field id="name" label="Full name" value={name} onChange={setName} error={nameError} />
+          <button type="submit" className="btn mt-3">Save name</button>
+          {nameMsg && <span role="status" className="ml-3 text-sm text-ok">{nameMsg}</span>}
+        </form>
+      </section>
+
+      <section className="card" aria-labelledby="student-profile">
+        <h2 id="student-profile" className="text-lg">Student profile</h2>
+        <p className="mt-1 text-sm text-mute">
+          Keep your academic details up to date for placement eligibility.
+        </p>
+
+        {profileLoading ? (
+          <p role="status" className="mt-4 text-sm">Loading student profile…</p>
+        ) : (
+          <form onSubmit={saveStudentDetails} noValidate className="mt-3 grid gap-1 sm:grid-cols-2 sm:gap-x-4">
+            <Field id="rollNumber" label="Roll number" value={profile.rollNumber}
+              onChange={(v) => updateField('rollNumber', v)} />
+
+            <Field id="phone" label="Phone" type="tel" value={profile.phone}
+              onChange={(v) => updateField('phone', v)} />
+
+            <Field id="dateOfBirth" label="Date of birth" type="date" value={profile.dateOfBirth}
+              onChange={(v) => updateField('dateOfBirth', v)} />
+
+            <Field id="degree" label="Degree" value={profile.degree}
+              onChange={(v) => updateField('degree', v)} />
+
+            <Field id="branch" label="Branch" value={profile.branch}
+              onChange={(v) => updateField('branch', v)} />
+
+            <Field id="graduationYear" label="Graduation year" type="number"
+              value={profile.graduationYear}
+              onChange={(v) => updateField('graduationYear', v)} error="" />
+
+            <Field id="cgpa" label="CGPA (0–10)" type="number" value={profile.cgpa}
+              onChange={(v) => updateField('cgpa', v)} error="" />
+
+            <Field id="activeBacklogs" label="Active backlogs" type="number"
+              value={profile.activeBacklogs}
+              onChange={(v) => updateField('activeBacklogs', v)} error="" />
+
+            {profileError && (
+              <p role="alert" className="sm:col-span-2 mt-2 text-sm text-danger">
+                {profileError}
+              </p>
+            )}
+
+            {profileMsg && (
+              <p role="status" className="sm:col-span-2 mt-2 text-sm text-ok">
+                {profileMsg}
+              </p>
+            )}
+
+            <div className="sm:col-span-2">
+              <button type="submit" className="btn mt-3" disabled={profileSaving}>
+                {profileSaving ? 'Saving…' : 'Save student profile'}
+              </button>
+            </div>
+          </form>
+        )}
+      </section>
+
+      <section className="card" aria-labelledby="resume">
+        <h2 id="resume" className="text-lg">Resume</h2>
+        <p className="mt-1 text-sm text-mute">
+          Upload your resume as a PDF. Maximum file size: 5 MB.
+        </p>
+
+        <form onSubmit={handleResumeUpload} className="mt-3 grid gap-3">
+          <label htmlFor="resumePdf" className="text-sm font-medium">
+            Choose resume PDF
+          </label>
+
+          <input
+            id="resumePdf"
+            type="file"
+            accept=".pdf,application/pdf"
+            onChange={(e) => {
+              setResumeFile(e.target.files?.[0] || null);
+              setResumeError('');
+              setResumeMsg('');
+            }}
+          />
+
+          {resumeFile && (
+            <p className="text-sm text-mute">
+              Selected: {resumeFile.name}
+            </p>
+          )}
+
+          {resumeError && <p role="alert" className="text-sm text-danger">{resumeError}</p>}
+          {resumeMsg && <p role="status" className="text-sm text-ok">{resumeMsg}</p>}
+
+          <button type="submit" className="btn" disabled={resumeUploading}>
+            {resumeUploading ? 'Uploading…' : 'Upload resume'}
+          </button>
+
+          {resumeUploaded && (
+            <p className="text-sm text-ok">Resume uploaded during this session.</p>
+          )}
+        </form>
+      </section>
+
+      <section className="card" aria-labelledby="ats">
+        <h2 id="ats" className="text-lg">Resume ATS analyzer</h2>
+        <p className="mt-1 text-sm text-mute">
+          Compare your uploaded resume with a job description to identify keyword gaps.
+        </p>
+
+        <form onSubmit={handleAnalyzeResume} className="mt-3 grid gap-3">
+          <label htmlFor="jobDescription" className="text-sm font-medium">
+            Job description
+          </label>
+
+          <textarea
+            id="jobDescription"
+            rows={8}
+            maxLength={20000}
+            value={jobDescription}
+            onChange={(e) => setJobDescription(e.target.value)}
+            className="w-full rounded border p-3"
+            placeholder="Paste the job description here…"
+          />
+
+          <p className="text-xs text-mute">
+            {jobDescription.length}/20,000 characters
+          </p>
+
+          {analysisError && (
+            <p role="alert" className="text-sm text-danger">{analysisError}</p>
+          )}
+
+          <button type="submit" className="btn" disabled={analyzing}>
+            {analyzing ? 'Analyzing…' : 'Analyze resume'}
+          </button>
+        </form>
+
+        {analysis && (
+          <div className="mt-4 grid gap-3">
+            <h3 className="text-lg font-semibold">
+              Keyword match score: {analysis.score}%
+            </h3>
+
+            <div>
+              <h4 className="font-medium">Matched keywords</h4>
+              {analysis.matchedKeywords?.length ? (
+                <p className="mt-1 text-sm">{analysis.matchedKeywords.join(', ')}</p>
+              ) : (
+                <p className="text-sm text-mute">No matching keywords found.</p>
+              )}
+            </div>
+
+            <div>
+              <h4 className="font-medium">Missing keywords</h4>
+              {analysis.missingKeywords?.length ? (
+                <p className="mt-1 text-sm">{analysis.missingKeywords.join(', ')}</p>
+              ) : (
+                <p className="text-sm text-mute">No missing keywords detected.</p>
+              )}
+            </div>
+
+            <p className="text-xs text-mute">{analysis.disclaimer}</p>
+          </div>
+        )}
+      </section>
+
+      <section className="card" aria-labelledby="pw">
+        <h2 id="pw" className="text-lg">Change password</h2>
+
+        <form onSubmit={savePassword} noValidate>
+          <Field id="cur" label="Current password" type="password"
+            autoComplete="current-password" value={pw.current}
+            onChange={(v) => setPw({ ...pw, current: v })} />
+
+          <Field id="new" label="New password" type="password"
+            autoComplete="new-password" value={pw.next}
+            onChange={(v) => setPw({ ...pw, next: v })} error={pwError} />
+
+          <button type="submit" className="btn mt-3">Change password</button>
+          {pwMsg && <span role="status" className="ml-3 text-sm text-ok">{pwMsg}</span>}
+        </form>
+      </section>
+    </main>
+  );
+}
+
+
+========== frontend\src\api\studentProfile.js ==========
+
+
+import { apiRequest } from './client.js';
+
+export const getStudentProfile = () =>
+  apiRequest('/students/me');
+
+export const saveStudentProfile = (profile) =>
+  apiRequest('/students/me', {
+    method: 'PUT',
+    body: profile,
+  });
+
+// Upload a PDF resume.
+// FormData is handled correctly by client.js.
+export const uploadStudentResume = (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return apiRequest('/students/me/resume', {
+    method: 'POST',
+    body: formData,
+  });
+};
+
+// Download the currently uploaded resume.
+export const downloadStudentResume = () =>
+  apiRequest('/students/me/resume');
+
+// Delete the uploaded resume.
+export const deleteStudentResume = () =>
+  apiRequest('/students/me/resume', {
+    method: 'DELETE',
+  });
+
+// Analyze resume keywords against a job description.
+export const analyzeStudentResume = (jobDescription) =>
+  apiRequest('/students/me/resume/analyze', {
+    method: 'POST',
+    body: { jobDescription },
+  });
+
+
+========== backend\src\main\java\com\campusconnect\student\StudentProfileService.java ==========
+
+package com.campusconnect.student;
+
+import com.campusconnect.auth.AuthUser;
+import com.campusconnect.common.ApiException;
+import java.io.IOException;
+import java.util.Locale;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.text.PDFTextStripper;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import static com.campusconnect.student.StudentProfileDtos.*;
+
+@Service
+public class StudentProfileService {
+
+    private static final long MAX_RESUME_SIZE = 5 * 1024 * 1024;
+
+    private final StudentProfileRepository profiles;
+
+    public StudentProfileService(StudentProfileRepository profiles) {
+        this.profiles = profiles;
+    }
+
+    @Transactional(readOnly = true)
+    public StudentProfileResponse getMyProfile(AuthUser me) {
+        return profiles.findByUserId(me.id())
+                .map(StudentProfileResponse::from)
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "Student profile not found. Save your profile first."));
+    }
+
+    @Transactional
+    public StudentProfileResponse updateMyProfile(
+            AuthUser me, UpdateStudentProfileRequest request) {
+
+        StudentProfile profile = profiles.findByUserId(me.id())
+                .orElseGet(() -> new StudentProfile(me.id()));
+
+        String rollNumber = normalize(request.rollNumber());
+
+        if (rollNumber != null
+                && profiles.existsByRollNumberIgnoreCase(rollNumber)
+                && !rollNumber.equalsIgnoreCase(profile.getRollNumber())) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "That roll number is already in use.");
+        }
+
+        profile.updateDetails(
+                rollNumber,
+                normalize(request.phone()),
+                request.dateOfBirth(),
+                normalize(request.degree()),
+                normalize(request.branch()),
+                request.graduationYear(),
+                request.cgpa(),
+                request.activeBacklogs(),
+                normalize(request.resumeUrl()));
+
+        try {
+            return StudentProfileResponse.from(
+                    profiles.saveAndFlush(profile));
+        } catch (DataIntegrityViolationException ex) {
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "The profile conflicts with an existing record.");
+        }
+    }
+
+    @Transactional
+    public void uploadResume(AuthUser me, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST, "Please select a PDF resume.");
+        }
+
+        if (file.getSize() > MAX_RESUME_SIZE) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST, "Resume must be 5 MB or smaller.");
+        }
+
+        String contentType = file.getContentType();
+        if (!"application/pdf".equalsIgnoreCase(contentType)) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST, "Only PDF resumes are allowed.");
+        }
+
+        try {
+            byte[] data = file.getBytes();
+
+            // Validate that the uploaded file is actually a readable PDF.
+            try (PDDocument document = Loader.loadPDF(data)) {
+                if (document.isEncrypted()) {
+                    throw new ApiException(
+                            HttpStatus.BAD_REQUEST,
+                            "Password-protected PDFs are not supported.");
+                }
+            }
+
+            StudentProfile profile = profiles.findByUserId(me.id())
+                    .orElseGet(() -> new StudentProfile(me.id()));
+
+            String fileName = file.getOriginalFilename();
+            if (fileName == null || fileName.isBlank()) {
+                fileName = "resume.pdf";
+            }
+
+            profile.storeResume(fileName, "application/pdf", data);
+            profiles.save(profile);
+
+        } catch (IOException ex) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST, "The uploaded PDF could not be read.");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public ResumeFile getMyResume(AuthUser me) {
+        StudentProfile profile = profiles.findByUserId(me.id())
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.NOT_FOUND, "Resume not found."));
+
+        if (!profile.hasResume()) {
+            throw new ApiException(
+                    HttpStatus.NOT_FOUND, "Resume not found. Upload a PDF first.");
+        }
+
+        return new ResumeFile(
+                profile.getResumeFileName(),
+                profile.getResumeData());
+    }
+
+    @Transactional
+    public void deleteMyResume(AuthUser me) {
+        StudentProfile profile = profiles.findByUserId(me.id())
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.NOT_FOUND, "Student profile not found."));
+
+        profile.removeResume();
+        profiles.save(profile);
+    }
+
+    @Transactional(readOnly = true)
+    public ResumeAnalysis analyzeResume(AuthUser me, String jobDescription) {
+        if (jobDescription == null || jobDescription.isBlank()) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "Please provide a job description.");
+        }
+
+        if (jobDescription.length() > 20000) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "Job description must be 20,000 characters or fewer.");
+        }
+
+        StudentProfile profile = profiles.findByUserId(me.id())
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.NOT_FOUND, "Student profile not found."));
+
+        if (!profile.hasResume()) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST,
+                    "Upload your PDF resume before analyzing it.");
+        }
+
+        try (PDDocument document = Loader.loadPDF(profile.getResumeData())) {
+            String resumeText = new PDFTextStripper().getText(document);
+            if (resumeText.isBlank()) {
+                throw new ApiException(
+                        HttpStatus.BAD_REQUEST,
+                        "No readable text was found in the PDF. Please upload a text-based PDF.");
+            }
+
+            var resumeWords = extractKeywords(resumeText);
+            var jobWords = extractKeywords(jobDescription);
+
+            var matched = jobWords.stream()
+                    .filter(resumeWords::contains)
+                    .sorted()
+                    .toList();
+
+            var missing = jobWords.stream()
+                    .filter(word -> !resumeWords.contains(word))
+                    .sorted()
+                    .toList();
+
+            int score = jobWords.isEmpty()
+                    ? 0
+                    : (int) Math.round(100.0 * matched.size() / jobWords.size());
+
+            return new ResumeAnalysis(
+                    score, matched, missing,
+                    "This is a keyword-based estimate, not a guarantee of ATS performance.");
+        } catch (IOException ex) {
+            throw new ApiException(
+                    HttpStatus.BAD_REQUEST, "Could not read the stored PDF resume.");
+        }
+    }
+
+    private java.util.Set<String> extractKeywords(String text) {
+        return java.util.Arrays.stream(
+                        text.toLowerCase(Locale.ROOT)
+                                .replaceAll("[^a-z0-9+#.]", " ")
+                                .split("\\s+"))
+                .filter(word -> word.length() >= 3)
+                .filter(word -> !java.util.Set.of(
+                        "the", "and", "for", "with", "you", "your",
+                        "are", "our", "this", "that", "will", "from",
+                        "have", "has", "can", "all", "any", "job",
+                        "role", "work", "years", "experience").contains(word))
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    public record ResumeFile(String fileName, byte[] data) {
+    }
+
+    public record ResumeAnalysis(
+            int score,
+            java.util.List<String> matchedKeywords,
+            java.util.List<String> missingKeywords,
+            String disclaimer) {
+    }
+}
+
+
+========== backend\src\main\java\com\campusconnect\student\StudentProfileController.java ==========
+
+package com.campusconnect.student;
+
+import com.campusconnect.auth.AuthUser;
+import com.campusconnect.student.StudentProfileDtos.StudentProfileResponse;
+import com.campusconnect.student.StudentProfileDtos.UpdateStudentProfileRequest;
+import jakarta.validation.Valid;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+@RestController
+@RequestMapping("/api/v1/students/me")
+@PreAuthorize("hasRole('STUDENT')")
+public class StudentProfileController {
+
+    private final StudentProfileService profiles;
+
+    public StudentProfileController(StudentProfileService profiles) {
+        this.profiles = profiles;
+    }
+
+    @GetMapping
+    public StudentProfileResponse getMyProfile(
+            @AuthenticationPrincipal AuthUser me) {
+        return profiles.getMyProfile(me);
+    }
+
+    @PutMapping
+    public StudentProfileResponse updateMyProfile(
+            @AuthenticationPrincipal AuthUser me,
+            @Valid @RequestBody UpdateStudentProfileRequest request) {
+        return profiles.updateMyProfile(me, request);
+    }
+
+    @PostMapping(value = "/resume", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Void> uploadResume(
+            @AuthenticationPrincipal AuthUser me,
+            @RequestParam("file") MultipartFile file) {
+        profiles.uploadResume(me, file);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/resume")
+    public ResponseEntity<byte[]> downloadResume(
+            @AuthenticationPrincipal AuthUser me) {
+        StudentProfileService.ResumeFile resume = profiles.getMyResume(me);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        ContentDisposition.attachment()
+                                .filename(resume.fileName())
+                                .build()
+                                .toString())
+                .body(resume.data());
+    }
+
+    @DeleteMapping("/resume")
+    public ResponseEntity<Void> deleteResume(
+            @AuthenticationPrincipal AuthUser me) {
+        profiles.deleteMyResume(me);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/resume/analyze")
+    public StudentProfileService.ResumeAnalysis analyzeResume(
+            @AuthenticationPrincipal AuthUser me,
+            @RequestBody ResumeAnalysisRequest request) {
+        return profiles.analyzeResume(me, request.jobDescription());
+    }
+
+    public record ResumeAnalysisRequest(String jobDescription) {
+    }
+}
+
+
+========== backend\src\main\java\com\campusconnect\student\StudentProfile.java ==========
+
+package com.campusconnect.student;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.Instant;
+
+@Entity
+@Table(name = "student_profiles")
+public class StudentProfile {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "user_id", nullable = false, unique = true)
+    private Long userId;
+
+    @Column(name = "roll_number", length = 40, unique = true)
+    private String rollNumber;
+
+    @Column(length = 20)
+    private String phone;
+
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+
+    @Column(length = 100)
+    private String degree;
+
+    @Column(length = 120)
+    private String branch;
+
+    @Column(name = "graduation_year")
+    private Short graduationYear;
+
+    @Column(precision = 4, scale = 2)
+    private BigDecimal cgpa;
+
+    @Column(name = "active_backlogs", nullable = false)
+    private Short activeBacklogs = 0;
+
+    // Legacy resume URL retained for compatibility
+    @Column(name = "resume_url", length = 2048)
+    private String resumeUrl;
+
+    // Resume PDF storage
+    @Column(name = "resume_file_name")
+    private String resumeFileName;
+
+    @Column(name = "resume_content_type")
+    private String resumeContentType;
+
+    @Column(name = "resume_data")
+    private byte[] resumeData;
+
+    @Column(name = "resume_uploaded_at")
+    private Instant resumeUploadedAt;
+
+    protected StudentProfile() {
+    }
+
+    public StudentProfile(Long userId) {
+        this.userId = userId;
+        this.activeBacklogs = 0;
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public String getRollNumber() {
+        return rollNumber;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public LocalDate getDateOfBirth() {
+        return dateOfBirth;
+    }
+
+    public String getDegree() {
+        return degree;
+    }
+
+    public String getBranch() {
+        return branch;
+    }
+
+    public Short getGraduationYear() {
+        return graduationYear;
+    }
+
+    public BigDecimal getCgpa() {
+        return cgpa;
+    }
+
+    public Short getActiveBacklogs() {
+        return activeBacklogs;
+    }
+
+    public String getResumeUrl() {
+        return resumeUrl;
+    }
+
+    public String getResumeFileName() {
+        return resumeFileName;
+    }
+
+    public String getResumeContentType() {
+        return resumeContentType;
+    }
+
+    public byte[] getResumeData() {
+        return resumeData;
+    }
+
+    public Instant getResumeUploadedAt() {
+        return resumeUploadedAt;
+    }
+
+    public boolean hasResume() {
+        return resumeData != null && resumeData.length > 0;
+    }
+
+    public void storeResume(
+            String fileName,
+            String contentType,
+            byte[] data) {
+
+        this.resumeFileName = fileName;
+        this.resumeContentType = contentType;
+        this.resumeData = data;
+        this.resumeUploadedAt = Instant.now();
+
+        // New resume uploads supersede the old URL.
+        this.resumeUrl = null;
+    }
+
+    public void removeResume() {
+        this.resumeFileName = null;
+        this.resumeContentType = null;
+        this.resumeData = null;
+        this.resumeUploadedAt = null;
+        this.resumeUrl = null;
+    }
+
+    public void updateDetails(
+            String rollNumber,
+            String phone,
+            LocalDate dateOfBirth,
+            String degree,
+            String branch,
+            Short graduationYear,
+            BigDecimal cgpa,
+            Short activeBacklogs,
+            String resumeUrl) {
+
+        this.rollNumber = rollNumber;
+        this.phone = phone;
+        this.dateOfBirth = dateOfBirth;
+        this.degree = degree;
+        this.branch = branch;
+        this.graduationYear = graduationYear;
+        this.cgpa = cgpa;
+        this.activeBacklogs = activeBacklogs == null ? 0 : activeBacklogs;
+
+        // Preserve uploaded resume; only update the legacy URL if provided.
+        if (resumeData == null) {
+            this.resumeUrl = resumeUrl;
+        }
+    }
+}
+
+
+========== backend\src\main\java\com\campusconnect\student\StudentProfileDtos.java ==========
+
+package com.campusconnect.student;
+
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
+public final class StudentProfileDtos {
+
+    private StudentProfileDtos() {
+    }
+
+    public record UpdateStudentProfileRequest(
+            @Size(max = 40) String rollNumber,
+            @Size(max = 20) String phone,
+            @Past LocalDate dateOfBirth,
+            @Size(max = 100) String degree,
+            @Size(max = 120) String branch,
+            @Min(2000) @Max(2100) Short graduationYear,
+            @DecimalMin("0.00") @DecimalMax("10.00") BigDecimal cgpa,
+            @PositiveOrZero Short activeBacklogs,
+            @Size(max = 2048) String resumeUrl
+    ) {
+    }
+
+    public record StudentProfileResponse(
+            Long id,
+            Long userId,
+            String rollNumber,
+            String phone,
+            LocalDate dateOfBirth,
+            String degree,
+            String branch,
+            Short graduationYear,
+            BigDecimal cgpa,
+            Short activeBacklogs,
+            String resumeUrl
+    ) {
+        public static StudentProfileResponse from(StudentProfile p) {
+            return new StudentProfileResponse(
+                    p.getId(),
+                    p.getUserId(),
+                    p.getRollNumber(),
+                    p.getPhone(),
+                    p.getDateOfBirth(),
+                    p.getDegree(),
+                    p.getBranch(),
+                    p.getGraduationYear(),
+                    p.getCgpa(),
+                    p.getActiveBacklogs(),
+                    p.getResumeUrl()
+            );
+        }
+    }
+}
+
+
+========== backend\src\main\resources\application.yml ==========
+
+
+spring:
+  application:
+    name: campusconnect-backend
+
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
+  config:
+    import:
+      - "optional:file:./.env[.properties]"
+      - "optional:file:../.env[.properties]"
+
+  autoconfigure:
+    # We authenticate against the users table. Never create Spring's generated development user.
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+
+  datasource:
+    # No defaults on purpose: the app refuses to start until these are provided (see ../.env.example).
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      connection-timeout: 5000
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # schema is owned by Flyway migrations, never by Hibernate
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-stacktrace: never
+    include-message: never
+    include-binding-errors: never
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        name: CC_SESSION
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}   # set true when served over HTTPS
+
+app:
+  version: "@project.version@"
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  security:
+    max-failed-logins: ${MAX_FAILED_LOGINS:5}
+    lockout-minutes: ${LOCKOUT_MINUTES:15}
+    bcrypt-strength: ${BCRYPT_STRENGTH:10}
+  bootstrap-admin:
+    # Optional. Creates the FIRST Placement Admin at startup only if none exists. Remove the password afterwards.
+    email: ${BOOTSTRAP_ADMIN_EMAIL:}
+    password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+    name: ${BOOTSTRAP_ADMIN_NAME:Placement Administrator}

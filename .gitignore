@@ -1,0 +1,32 @@
+.env
+*.env.local
+node_modules/
+dist/
+target/
+.idea/
+.vscode/
+*.log
+uploads/
+
+# Environment and secrets
+.env.*
+!.env.example
+application-local.yml
+application-local.yaml
+secrets/
+*.pem
+*.key
+
+# Local databases and backups
+*.db
+*.sqlite
+*.sqlite3
+*.bak
+
+# OS files
+Thumbs.db
+.DS_Store
+# Local project backups
+backup-ats-*/
+# Accidental duplicate source folder
+backend/backend/

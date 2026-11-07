@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CampusConnect – Campus Placement Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f5f8;--surf:#fff;--ink:#101828;--mute:#5b6577;--line:#dfe3ea;--pri:#1f4fd8;--priT:#e6ecff;--ok:#0b8a5f;--okT:#dcf5ea;--warn:#b7791f;--warnT:#fdf0d5;--bad:#c0392b;--badT:#fbe3e0;--board:#0d1424;--amber:#ffb83d;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b101c;--surf:#141b2b;--ink:#e8ecf5;--mute:#9aa5ba;--line:#26304a;--pri:#7c9bff;--priT:#1d2a52;--ok:#4cd6a0;--okT:#10382c;--warn:#f0b955;--warnT:#3a2d12;--bad:#ff8a7a;--badT:#3d1b18;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b101c;--surf:#141b2b;--ink:#e8ecf5;--mute:#9aa5ba;--line:#26304a;--pri:#7c9bff;--priT:#1d2a52;--ok:#4cd6a0;--okT:#10382c;--warn:#f0b955;--warnT:#3a2d12;--bad:#ff8a7a;--badT:#3d1b18;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 "DM Sans",system-ui,sans-serif}
+h1,h2,h3{font-family:"Bricolage Grotesque","DM Sans",sans-serif;margin:0;letter-spacing:-.02em}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--pri);outline-offset:2px}
+.btn{background:var(--pri);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-weight:700;cursor:pointer}
+:root[data-theme="dark"] .btn.p,.btn{--x:0}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn{color:#0b101c}}
+.btn.g{background:transparent;color:var(--ink);border:1px solid var(--line)}.btn.d{background:var(--bad);color:#fff}.btn.s{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.top{display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--surf);border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.logo{font:800 20px "Bricolage Grotesque",sans-serif}.logo i{color:var(--pri);font-style:normal}
+.sp{flex:1}.tag{font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--priT);color:var(--pri)}
+.shell{display:grid;grid-template-columns:210px 1fr;min-height:calc(100vh - 58px)}
+nav{padding:16px 12px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:4px}
+nav button{text-align:left;background:none;border:0;padding:9px 12px;border-radius:8px;cursor:pointer;color:var(--mute);font-weight:500}
+nav button.on{background:var(--priT);color:var(--pri);font-weight:700}
+main{padding:24px;max-width:1100px;width:100%}
+@media(max-width:760px){.shell{grid-template-columns:1fr}nav{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}main{padding:16px}}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:18px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(290px,1fr))}
+.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:16px 0}
+.stat b{display:block;font:800 28px "Bricolage Grotesque",sans-serif}.stat span{color:var(--mute);font-size:13px}
+.pill{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:99px}
+.ok{background:var(--okT);color:var(--ok)}.wn{background:var(--warnT);color:var(--warn)}.bd{background:var(--badT);color:var(--bad)}.nt{background:var(--priT);color:var(--pri)}
+.muted{color:var(--mute)}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);font-size:14px}th{color:var(--mute);font-weight:500}
+.tw{overflow-x:auto}
+label{display:block;font-size:13px;font-weight:700;margin:10px 0 4px}
+input,select,textarea{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--surf)}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}@media(max-width:560px){.f2{grid-template-columns:1fr}}
+.steps{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}.steps span{flex:1;min-width:90px;padding:6px 8px;border-radius:8px;font-size:12px;font-weight:700;text-align:center;background:var(--bg);color:var(--mute)}
+.steps .c{background:var(--okT);color:var(--ok)}.steps .a{background:var(--warnT);color:var(--warn)}.steps .x{background:var(--badT);color:var(--bad)}
+.bar{height:10px;border-radius:6px;background:var(--bg);overflow:hidden;margin-top:4px}.bar i{display:block;height:100%;background:var(--pri)}
+.hero{display:grid;grid-template-columns:1.1fr 1fr;gap:32px;max-width:1100px;margin:0 auto;padding:48px 24px;align-items:center}@media(max-width:820px){.hero{grid-template-columns:1fr;padding:28px 16px}}
+.hero h1{font-size:clamp(34px,5vw,56px);line-height:1.04}.hero p{font-size:17px;color:var(--mute);max-width:46ch}
+.board{background:var(--board);border-radius:14px;padding:16px;color:var(--amber);box-shadow:0 0 0 1px #26304a}
+.board h3{color:#fff;font-size:15px;margin-bottom:8px}.board div{display:grid;grid-template-columns:1.2fr 1.4fr .8fr;gap:8px;padding:9px 0;border-top:1px dashed #2c3858;font-size:14px;font-variant-numeric:tabular-nums}
+.board em{color:#6ee7b7;font-style:normal;text-align:right}
+.ring{width:110px;height:110px;border-radius:50%;display:grid;place-items:center;font:800 30px "Bricolage Grotesque",sans-serif;background:conic-gradient(var(--c) calc(var(--p)*1%),var(--bg) 0)}
+.ring span{width:84px;height:84px;border-radius:50%;background:var(--surf);display:grid;place-items:center}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:8px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9}
+#toast.on{opacity:1}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head>
+<body>
+<div id="app"></div><div id="toast" role="status" aria-live="polite"></div>
+<script>
+const K='cc_v1',D=['CSE','IT','ECE','ME'];
+const seed=()=>({
+ drives:[
+ {id:1,company:'Nimbus Systems',role:'Software Engineer',ctc:8.5,min:7.5,br:['CSE','IT'],due:'2026-11-10',rounds:['Online test','Technical','HR'],kw:['java','python','sql','dsa','oop','git']},
+ {id:2,company:'Volt Circuits',role:'Embedded Engineer',ctc:6.2,min:7,br:['ECE','CSE'],due:'2026-11-18',rounds:['Aptitude','Technical','HR'],kw:['c','embedded','microcontroller','iot','python']},
+ {id:3,company:'Granite Infra',role:'Graduate Engineer Trainee',ctc:5,min:6.5,br:['ME','ECE'],due:'2026-11-25',rounds:['Aptitude','Interview'],kw:['autocad','design','manufacturing','project']},
+ {id:4,company:'Lumen Analytics',role:'Data Analyst',ctc:7,min:8,br:['CSE','IT'],due:'2026-12-02',rounds:['Case study','Technical','HR'],kw:['python','sql','statistics','machine learning','excel']}],
+ students:[['Aarav Sen','CSE',9.2],['Diya Mukherjee','CSE',8.1],['Kabir Das','CSE',7.2],['Ishita Roy','IT',8.7],['Rohan Ghosh','IT',6.9],['Meera Basu','ECE',8.4],['Sourav Paul','ECE',7.1],['Tania Dey','ECE',6.4],['Arjun Nandi','ME',7.6],['Priya Saha','ME',6.8],['Neil Chatterjee','CSE',7.9],['Sneha Pal','IT',7.4]].map((s,i)=>({id:i+1,name:s[0],dept:s[1],cgpa:s[2],batch:2026})),
+ apps:[{id:1,sid:1,did:1,stage:1,res:'active'},{id:2,sid:2,did:1,stage:3,res:'selected'},{id:3,sid:4,did:4,stage:0,res:'rejected'},{id:4,sid:6,did:2,stage:2,res:'active'}]});
+let DB,S={user:null,view:'',f:null};
+try{DB=JSON.parse(localStorage.getItem(K))}catch(e){}
+if(!DB)DB=seed();
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(DB))}catch(e){}};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const $=s=>document.querySelector(s);
+const dr=id=>DB.drives.find(d=>d.id==id),st=id=>DB.students.find(s=>s.id==id);
+const placed=sid=>DB.apps.some(a=>a.sid==sid&&a.res=='selected');
+const elig=(s,d)=>s.cgpa>=d.min?(d.br.includes(s.dept)?'':'Open to '+d.br.join(', ')+' only'):'Needs CGPA '+d.min+'+';
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove('on'),2200)}
+const NAV={student:[['drives','Drives'],['apps','My applications'],['resume','Resume check']],spoc:[['dept','Department'],['stats','Analytics']],admin:[['adrives','Drives'],['aapps','Applications'],['stats','Analytics']]};
+
+function pill(a,d){if(a.res=='selected')return'<span class="pill ok">Selected</span>';if(a.res=='rejected')return'<span class="pill bd">Not selected</span>';return`<span class="pill wn">${esc(d.rounds[a.stage])}</span>`}
+function steps(a,d){return`<div class="steps">${d.rounds.map((r,i)=>{let c=i<a.stage?'c':(i==a.stage?(a.res=='rejected'?'x':(a.res=='active'?'a':'')):'');return`<span class="${c}">${esc(r)}</span>`}).join('')}</div>`}
+
+function login(){
+ const live=DB.drives.slice(0,4).map(d=>`<div><span>${esc(d.company)}</span><span>${esc(d.role)}</span><em>${d.ctc} LPA</em></div>`).join('');
+ return`<header class="top"><span class="logo">Campus<i>Connect</i></span><span class="sp"></span><button class="btn g s" data-a="theme">Theme</button></header>
+ <section class="hero"><div><h1>One place for every placement round.</h1>
+ <p>Students track each company and round, department coordinators see their batch at a glance, and the placement cell runs drives without spreadsheets.</p>
+ <div class="card" style="margin-top:22px"><h3 style="margin-bottom:6px">Sign in (demo accounts)</h3>
+ <label for="r">Role</label><select id="r" data-a="rolechg"><option value="student">Student</option><option value="spoc">Department SPOC</option><option value="admin">Placement cell admin</option></select>
+ <div id="who"></div><button class="btn" style="margin-top:14px" data-a="login">Continue</button></div></div>
+ <div class="board" aria-label="Open drives"><h3>Open drives</h3>${live}</div></section>`}
+function who(r){return r=='student'?`<label for="w">Student</label><select id="w">${DB.students.map(s=>`<option value="${s.id}">${esc(s.name)} · ${s.dept}</option>`).join('')}</select>`:r=='spoc'?`<label for="w">Department</label><select id="w">${D.map(d=>`<option>${d}</option>`).join('')}</select>`:'<p class="muted">Full access to drives, applications and analytics.</p>'}
+
+function shell(body){const u=S.user,n=NAV[u.role];
+ return`<header class="top"><span class="logo">Campus<i>Connect</i></span><span class="tag">${{student:'Student',spoc:'SPOC · '+u.dept,admin:'Admin'}[u.role]}</span><span class="sp"></span>
+ <span class="muted">${esc(u.name)}</span><button class="btn g s" data-a="theme">Theme</button><button class="btn g s" data-a="out">Sign out</button></header>
+ <div class="shell"><nav aria-label="Main">${n.map(x=>`<button class="${S.view==x[0]?'on':''}" data-a="go" data-v="${x[0]}">${x[1]}</button>`).join('')}${u.role=='admin'?'<button data-a="reset" style="margin-top:auto">Reset demo data</button>':''}</nav><main>${body}</main></div>`}
+
+/* student */
+function vDrives(){const s=st(S.user.sid);
+ return`<h2>Open drives</h2><p class="muted">Eligibility is checked against your CGPA and branch.</p><div class="grid" style="margin-top:14px">${DB.drives.map(d=>{
+ const a=DB.apps.find(x=>x.sid==s.id&&x.did==d.id),why=elig(s,d);
+ return`<div class="card"><div class="row"><h3>${esc(d.company)}</h3><span class="sp"></span><span class="pill nt">${d.ctc} LPA</span></div>
+ <div>${esc(d.role)}</div><p class="muted" style="margin:6px 0">Min CGPA ${d.min} · ${d.br.join(', ')} · Apply by ${d.due}</p>
+ <div class="muted" style="font-size:13px">${d.rounds.join(' → ')}</div><div style="margin-top:12px">${a?'<span class="pill ok">Applied</span>':why?`<span class="muted">${why}</span>`:`<button class="btn s" data-a="apply" data-id="${d.id}">Apply</button>`}</div></div>`}).join('')}</div>`}
+function vApps(){const s=st(S.user.sid),mine=DB.apps.filter(a=>a.sid==s.id);
+ return`<h2>My applications</h2><div class="stats"><div class="card stat"><b>${s.cgpa}</b><span>CGPA</span></div><div class="card stat"><b>${mine.length}</b><span>Companies applied</span></div><div class="card stat"><b>${placed(s.id)?'Placed':'Open'}</b><span>Placement status</span></div></div>
+ ${mine.length?mine.map(a=>{const d=dr(a.did);return`<div class="card" style="margin-bottom:12px"><div class="row"><h3>${esc(d.company)}</h3><span class="muted">${esc(d.role)}</span><span class="sp"></span>${pill(a,d)}</div>${steps(a,d)}</div>`}).join(''):'<div class="card muted">No applications yet. Open Drives and apply to a company you are eligible for.</div>'}`}
+
+/* resume */
+function vResume(){return`<h2>Resume check</h2><p class="muted">Paste your resume text. The check runs in your browser and nothing is uploaded.</p>
+ <div class="card" style="margin-top:14px"><label for="rd">Compare against a drive (optional)</label><select id="rd"><option value="">General ATS check</option>${DB.drives.map(d=>`<option value="${d.id}">${esc(d.company)} – ${esc(d.role)}</option>`).join('')}</select>
+ <label for="rt">Resume text</label><textarea id="rt" rows="10" placeholder="Name, email, phone, Education, Skills, Projects…"></textarea>
+ <button class="btn" style="margin-top:12px" data-a="scan">Check resume</button></div><div id="rres"></div>`}
+function scan(){const txt=$('#rt').value,did=$('#rd').value;if(txt.trim().split(/\s+/).length<30){toast('Paste at least 30 words of resume text');return}
+ const t=txt.toLowerCase(),w=txt.trim().split(/\s+/).length,vb=(t.match(/\b(built|developed|designed|led|implemented|created|optimized|deployed|analy[sz]ed|improved|automated)\b/g)||[]).length,nm=(txt.match(/\d+(\.\d+)?\s?%|\b\d{2,}\b/g)||[]).length;
+ const C=[['Email and phone number present',/\S+@\S+\.\S+/.test(txt)&&/\d{10}|\d{5}[\s-]\d{5}/.test(txt),10,'Add a professional email and a 10-digit phone number at the top.'],
+ ['Education section',/education|b\.?\s?tech|cgpa/.test(t),10,'Add an Education section with degree, college and CGPA.'],
+ ['Skills section',/skills/.test(t),15,'Add a Skills section listing languages and tools.'],
+ ['Projects section',/project/.test(t),15,'Add 2–3 projects with what you built and the stack.'],
+ ['Action verbs used (4+)',vb>=4,15,'Start bullet points with verbs like built, designed, implemented.'],
+ ['Measurable results (3+ numbers)',nm>=3,15,'Quantify impact: users, accuracy %, time saved.'],
+ ['Length of 250–700 words',w>=250&&w<=700,10,w<250?'Resume is short: add detail to projects and skills.':'Resume is long: trim to one page.']];
+ if(did){const k=dr(did).kw,hit=k.filter(x=>new RegExp('(^|[^a-z])'+x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'([^a-z]|$)').test(t));C.push(['Keywords for '+dr(did).company+' ('+hit.length+'/'+k.length+')',hit.length/k.length>=.6,15,'Missing keywords: '+k.filter(x=>!hit.includes(x)).join(', ')+'. Add them only where true.'])}
+ const tot=C.reduce((a,c)=>a+c[2],0),got=C.reduce((a,c)=>a+(c[1]?c[2]:0),0),p=Math.round(got/tot*100),col=p>=75?'var(--ok)':p>=50?'var(--warn)':'var(--bad)';
+ $('#rres').innerHTML=`<div class="card" style="margin-top:14px"><div class="row" style="gap:20px"><div class="ring" style="--p:${p};--c:${col}"><span>${p}</span></div><div><h3>ATS readiness: ${p}/100</h3><p class="muted">${w} words · ${vb} action verbs · ${nm} numbers</p></div></div>
+ <table style="margin-top:12px">${C.map(c=>`<tr><td>${c[1]?'<span class="pill ok">Pass</span>':'<span class="pill bd">Fix</span>'}</td><td>${esc(c[0])}${c[1]?'':`<div class="muted">${esc(c[3])}</div>`}</td></tr>`).join('')}</table></div>`}
+
+/* spoc / admin */
+function vDept(){const dp=S.user.dept,ss=DB.students.filter(s=>s.dept==dp),pl=ss.filter(s=>placed(s.id)).length;
+ return`<h2>${dp} department</h2><div class="stats"><div class="card stat"><b>${ss.length}</b><span>Students</span></div><div class="card stat"><b>${pl}</b><span>Placed</span></div><div class="card stat"><b>${ss.length?Math.round(pl/ss.length*100):0}%</b><span>Placement rate</span></div></div>
+ <div class="card tw"><table><tr><th>Student</th><th>CGPA</th><th>Applications</th><th>Status</th></tr>${ss.map(s=>{const n=DB.apps.filter(a=>a.sid==s.id);return`<tr><td>${esc(s.name)}</td><td>${s.cgpa}</td><td>${n.map(a=>esc(dr(a.did).company)+' ('+(a.res=='selected'?'selected':a.res=='rejected'?'out':dr(a.did).rounds[a.stage])+')').join(', ')||'<span class="muted">None</span>'}</td><td>${placed(s.id)?'<span class="pill ok">Placed</span>':'<span class="pill wn">Open</span>'}</td></tr>`}).join('')}</table></div>`}
+function vStats(){const dp=S.user.role=='spoc'?[S.user.dept]:D,ss=DB.students.filter(s=>dp.includes(s.dept)),pl=ss.filter(s=>placed(s.id)).length,as=DB.apps.filter(a=>ss.some(s=>s.id==a.sid));
+ const bar=(l,n,t)=>`<div style="margin-bottom:12px"><div class="row"><b>${l}</b><span class="sp"></span><span class="muted">${n}/${t} placed (${t?Math.round(n/t*100):0}%)</span></div><div class="bar"><i style="width:${t?n/t*100:0}%"></i></div></div>`;
+ const co=DB.drives.map(d=>[d.company,as.filter(a=>a.did==d.id).length,as.filter(a=>a.did==d.id&&a.res=='selected').length]);
+ return`<h2>Analytics</h2><div class="stats"><div class="card stat"><b>${ss.length}</b><span>Students</span></div><div class="card stat"><b>${pl}</b><span>Placed</span></div><div class="card stat"><b>${as.length}</b><span>Applications</span></div><div class="card stat"><b>${as.filter(a=>a.res=='active').length}</b><span>In process</span></div></div>
+ <div class="grid"><div class="card"><h3 style="margin-bottom:12px">Department-wise</h3>${dp.map(d=>{const x=ss.filter(s=>s.dept==d);return bar(d,x.filter(s=>placed(s.id)).length,x.length)}).join('')}</div>
+ <div class="card"><h3 style="margin-bottom:12px">Batch-wise</h3>${[...new Set(ss.map(s=>s.batch))].sort().map(b=>{const x=ss.filter(s=>s.batch==b);return bar('Batch '+b,x.filter(s=>placed(s.id)).length,x.length)}).join('')}</div>
+ <div class="card"><h3 style="margin-bottom:8px">By company</h3><table>${co.map(c=>`<tr><td>${esc(c[0])}</td><td>${c[1]} applied</td><td>${c[2]} selected</td></tr>`).join('')}</table></div></div>`}
+function vAdrives(){return`<h2>Drives</h2><div class="card" style="margin:14px 0"><h3>Create a drive</h3><div class="f2">
+ <div><label for="c1">Company</label><input id="c1"></div><div><label for="c2">Role</label><input id="c2"></div>
+ <div><label for="c3">CTC (LPA)</label><input id="c3" type="number" min="0" step=".1"></div><div><label for="c4">Minimum CGPA</label><input id="c4" type="number" min="0" max="10" step=".1" value="6.5"></div>
+ <div><label for="c5">Apply by</label><input id="c5" type="date"></div><div><label for="c6">Rounds (comma separated)</label><input id="c6" value="Aptitude, Technical, HR"></div></div>
+ <label>Eligible branches</label><div class="row">${D.map(d=>`<label style="margin:0;font-weight:500"><input type="checkbox" class="cb" value="${d}" style="width:auto" checked> ${d}</label>`).join('')}</div>
+ <button class="btn" style="margin-top:12px" data-a="mk">Create drive</button></div>
+ <div class="card tw"><table><tr><th>Company</th><th>Role</th><th>CTC</th><th>Eligibility</th><th>Applicants</th><th></th></tr>${DB.drives.map(d=>`<tr><td>${esc(d.company)}</td><td>${esc(d.role)}</td><td>${d.ctc}</td><td>${d.min}+ · ${d.br.join(', ')}</td><td>${DB.apps.filter(a=>a.did==d.id).length}</td><td><button class="btn d s" data-a="del" data-id="${d.id}">Delete</button></td></tr>`).join('')}</table></div>`}
+function vAapps(){const f=S.f||'';const L=DB.apps.filter(a=>!f||a.did==f);
+ return`<h2>Applications</h2><label for="fl">Filter by drive</label><select id="fl" data-a="flt" style="max-width:320px"><option value="">All drives</option>${DB.drives.map(d=>`<option value="${d.id}" ${f==d.id?'selected':''}>${esc(d.company)}</option>`).join('')}</select>
+ <div class="card tw" style="margin-top:14px"><table><tr><th>Student</th><th>Dept</th><th>Company</th><th>Round</th><th>Update</th></tr>${L.map(a=>{const d=dr(a.did),s=st(a.sid),act=a.res=='active';return`<tr><td>${esc(s.name)}</td><td>${s.dept}</td><td>${esc(d.company)}</td><td>${pill(a,d)}</td><td class="row">${act?`<button class="btn s" data-a="adv" data-id="${a.id}">${a.stage==d.rounds.length-1?'Select':'Clear round'}</button><button class="btn g s" data-a="rej" data-id="${a.id}">Reject</button>`:'<span class="muted">Closed</span>'}</td></tr>`}).join('')||'<tr><td colspan="5" class="muted">No applications for this drive yet.</td></tr>'}</table></div>`}
+
+const V={drives:vDrives,apps:vApps,resume:vResume,dept:vDept,stats:vStats,adrives:vAdrives,aapps:vAapps};
+function render(){$('#app').innerHTML=S.user?shell(V[S.view]()):login();if(!S.user)$('#who').innerHTML=who('student')}
+const A={
+ theme(){const r=document.documentElement,dk=r.dataset.theme?r.dataset.theme=='dark':matchMedia('(prefers-color-scheme:dark)').matches;r.dataset.theme=dk?'light':'dark'},
+ rolechg(){$('#who').innerHTML=who($('#r').value)},
+ login(){const r=$('#r').value,w=$('#w')&&$('#w').value;S.user=r=='student'?{role:r,sid:+w,name:st(w).name}:r=='spoc'?{role:r,dept:w,name:w+' SPOC'}:{role:r,name:'Placement Cell'};S.view=NAV[r][0][0];render()},
+ out(){S.user=null;render()},go(d){S.view=d.v;render()},
+ apply(d){const s=st(S.user.sid),x=dr(d.id);if(elig(s,x))return;DB.apps.push({id:Date.now(),sid:s.id,did:x.id,stage:0,res:'active'});save();toast('Applied to '+x.company);render()},
+ scan,
+ mk(){const g=i=>$('#c'+i).value.trim(),br=[...document.querySelectorAll('.cb:checked')].map(c=>c.value),rd=g(6).split(',').map(x=>x.trim()).filter(Boolean);
+  if(!g(1)||!g(2)||!g(3)||!g(5)||!br.length||!rd.length){toast('Fill every field and pick a branch');return}
+  DB.drives.push({id:Date.now(),company:g(1),role:g(2),ctc:+g(3),min:+g(4),br,due:g(5),rounds:rd,kw:[]});save();toast('Drive created');render()},
+ del(d){if(!confirm('Delete this drive and its applications?'))return;DB.drives=DB.drives.filter(x=>x.id!=d.id);DB.apps=DB.apps.filter(a=>a.did!=d.id);save();toast('Drive deleted');render()},
+ flt(){S.f=$('#fl').value;render()},
+ adv(d){const a=DB.apps.find(x=>x.id==d.id),x=dr(a.did);a.stage++;if(a.stage>=x.rounds.length){a.stage=x.rounds.length;a.res='selected'}save();toast('Updated');render()},
+ rej(d){DB.apps.find(x=>x.id==d.id).res='rejected';save();toast('Marked not selected');render()},
+ reset(){if(!confirm('Restore demo data?'))return;DB=seed();save();toast('Demo data restored');render()}};
+document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t&&t.tagName!='SELECT'&&A[t.dataset.a])A[t.dataset.a](t.dataset)});
+document.addEventListener('change',e=>{const t=e.target.closest('select[data-a]');if(t)A[t.dataset.a](t.dataset)});
+render();
+</script></body></html>
